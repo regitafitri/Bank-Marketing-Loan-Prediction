@@ -1,141 +1,97 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import joblib
 import matplotlib.pyplot as plt
+from datetime import datetime
 
-# =========================================
+# ==============================
 # PAGE CONFIG
-# =========================================
+# ==============================
 st.set_page_config(
-    page_title="Bank Deposit Prediction",
+    page_title="Bank Deposit Prediction Dashboard",
     page_icon="🏦",
     layout="wide"
 )
 
-# =========================================
+# ==============================
 # LOAD DATA
-# =========================================
+# ==============================
 @st.cache_data
 def load_data():
     return pd.read_csv("bank (data final project).csv")
 
 df = load_data()
 
-# =========================================
+# ==============================
 # LOAD MODEL
-# =========================================
+# ==============================
 @st.cache_resource
-def load_model():
+def load_pipeline():
     return joblib.load("bank_marketing_pipeline_xgb.pkl")
 
-pipeline = load_model()
+pipeline = load_pipeline()
 
-# =========================================
+# ==============================
+# SESSION STATE
+# ==============================
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# ==============================
 # TITLE
-# =========================================
+# ==============================
 st.title("🏦 Bank Deposit Prediction Dashboard")
 
-st.markdown("""
-Predict whether a customer will subscribe to a term deposit.
-""")
+st.markdown("Predict whether a customer will subscribe to a term deposit.")
 
-# =========================================
-# SIDEBAR
-# =========================================
-st.sidebar.header("Customer Information")
+# ==============================
+# SIDEBAR INPUT
+# ==============================
+st.sidebar.header("Customer Input")
 
 age = st.sidebar.number_input("Age", 18, 100, 40)
 
-job = st.sidebar.selectbox(
-    "Job",
-    [
-        "admin.","blue-collar","entrepreneur",
-        "housemaid","management","retired",
-        "self-employed","services","student",
-        "technician","unemployed","unknown"
-    ]
-)
+job = st.sidebar.selectbox("Job", [
+    "admin.", "blue-collar", "entrepreneur", "housemaid",
+    "management", "retired", "self-employed", "services",
+    "student", "technician", "unemployed", "unknown"
+])
 
-marital = st.sidebar.selectbox(
-    "Marital Status",
-    ["married","single","divorced"]
-)
+marital = st.sidebar.selectbox("Marital", ["married", "single", "divorced"])
 
-education = st.sidebar.selectbox(
-    "Education",
-    ["primary","secondary","tertiary","unknown"]
-)
+education = st.sidebar.selectbox("Education", ["primary", "secondary", "tertiary", "unknown"])
 
-default = st.sidebar.selectbox(
-    "Credit Default",
-    ["no","yes"]
-)
+default = st.sidebar.selectbox("Credit Default", ["no", "yes"])
 
-balance = st.sidebar.number_input(
-    "Balance",
-    value=1000
-)
+balance = st.sidebar.number_input("Balance", value=1000)
 
-housing = st.sidebar.selectbox(
-    "Housing Loan",
-    ["no","yes"]
-)
+housing = st.sidebar.selectbox("Housing Loan", ["no", "yes"])
 
-loan = st.sidebar.selectbox(
-    "Personal Loan",
-    ["no","yes"]
-)
+loan = st.sidebar.selectbox("Personal Loan", ["no", "yes"])
 
-contact = st.sidebar.selectbox(
-    "Contact Type",
-    ["cellular","telephone","unknown"]
-)
+contact = st.sidebar.selectbox("Contact", ["cellular", "telephone", "unknown"])
 
-day = st.sidebar.slider(
-    "Last Contact Day",
-    1,31,15
-)
+day = st.sidebar.slider("Day", 1, 31, 15)
 
-month = st.sidebar.selectbox(
-    "Month",
-    [
-        "jan","feb","mar","apr","may","jun",
-        "jul","aug","sep","oct","nov","dec"
-    ]
-)
+month = st.sidebar.selectbox("Month", ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"])
 
-duration = st.sidebar.number_input(
-    "Call Duration",
-    min_value=0,
-    value=300
-)
+duration = st.sidebar.number_input("Duration", 0, 5000, 300)
 
-campaign = st.sidebar.number_input(
-    "Campaign Contacts",
-    min_value=1,
-    value=1
-)
+campaign = st.sidebar.number_input("Campaign", 1, 50, 1)
 
-pdays = st.sidebar.number_input(
-    "Pdays",
-    value=-1
-)
+pdays = st.sidebar.number_input("Pdays", value=-1)
 
-previous = st.sidebar.number_input(
-    "Previous Contacts",
-    min_value=0,
-    value=0
-)
+previous = st.sidebar.number_input("Previous", value=0)
 
-poutcome = st.sidebar.selectbox(
-    "Previous Outcome",
-    ["unknown","failure","success","other"]
-)
+poutcome = st.sidebar.selectbox("Poutcome", ["unknown", "failure", "success", "other"])
 
-# =========================================
-# PREDICT BUTTON
-# =========================================
-if st.sidebar.button("Predict"):
+predict_button = st.sidebar.button("Predict")
+
+# ==============================
+# PREDICTION
+# ==============================
+if predict_button:
 
     input_df = pd.DataFrame([{
         "age": age,
@@ -157,46 +113,51 @@ if st.sidebar.button("Predict"):
     }])
 
     prob = pipeline.predict_proba(input_df)[0][1]
-
     score = int(prob * 100)
 
-    st.subheader("Prediction Result")
-
-    st.metric(
-        "Probability",
-        f"{prob:.2%}"
-    )
-
-    st.metric(
-        "Score",
-        f"{score}/100"
-    )
-
     if score >= 80:
-        st.success("Very Likely to Subscribe")
+        category = "Very Likely"
     elif score >= 60:
-        st.warning("Likely to Subscribe")
+        category = "Likely"
     else:
-        st.error("Unlikely to Subscribe")
+        category = "Unlikely"
 
-    st.progress(score / 100)
+    st.session_state.last_prediction = {
+        "prob": prob,
+        "score": score,
+        "category": category,
+        "input_df": input_df
+    }
 
-# =========================================
-# DATA OVERVIEW
-# =========================================
-st.subheader("Dataset Overview")
+    st.session_state.history.append({
+        "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Probability": f"{prob:.1%}",
+        "Score": score,
+        "Category": category
+    })
 
-col1, col2 = st.columns(2)
+# ==============================
+# OUTPUT
+# ==============================
+if "last_prediction" in st.session_state:
 
-with col1:
-    st.write(df.head())
+    pred = st.session_state.last_prediction
 
-with col2:
-    fig, ax = plt.subplots()
+    st.subheader("Result")
 
-    df["deposit"].value_counts().plot(
-        kind="bar",
-        ax=ax
-    )
+    st.metric("Probability", f"{pred['prob']:.1%}")
+    st.metric("Score", f"{pred['score']}/100")
+    st.metric("Category", pred["category"])
 
-    st.pyplot(fig)
+    st.progress(pred["score"]/100)
+
+    st.write(pred["input_df"])
+else:
+    st.info("Input data lalu klik Predict")
+    
+# ==============================
+# HISTORY
+# ==============================
+if st.session_state.history:
+    st.subheader("History")
+    st.dataframe(pd.DataFrame(st.session_state.history))
