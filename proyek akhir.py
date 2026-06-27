@@ -30,7 +30,7 @@ df = load_data()
 def load_pipeline():
     return joblib.load("bank_marketing_pipeline_xgb.pkl")
 
-pipeline = load_pipeline()
+pipeline = joblib.load("bank_marketing_pipeline_xgb.pkl")
 
 # ==============================
 # SESSION STATE
